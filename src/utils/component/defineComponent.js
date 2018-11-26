@@ -1,5 +1,4 @@
 import {
-  filter,
   forEach,
   get,
   isFunction,
@@ -7,10 +6,13 @@ import {
   map,
   or,
   resolve,
-  clone
+  clone,
+  set,
+  walkReduceDepthFirst
 } from '@serverless/utils'
 // import appendKey from './appendKey'
 // import getKey from './getKey'
+import isTypeConstruct from '../type/isTypeConstruct'
 import hydrateComponent from './hydrateComponent'
 import isComponent from './isComponent'
 import { SYMBOL_STATE } from '../constants'
@@ -41,9 +43,25 @@ const defineComponent = async (component, state, context) => {
   }
 
   component = hydrateComponent(component, state, context)
+
   if (isFunction(component.define)) {
     let children = await or(component.define(context), {})
-    children = filter(isComponent, map(resolve, children))
+    children = await walkReduceDepthFirst(
+      async (accum, value, pathParts) => {
+        const propName = pathParts.slice(-1)[0]
+        if (isTypeConstruct(value)) {
+          const child = await context.import(value.type)
+          const instance = await context.construct(child, value.inputs)
+          return set(propName, instance, accum)
+        } else if (isComponent(value)) {
+          const instance = resolve(value)
+          return set(propName, instance, accum)
+        }
+        return accum
+      },
+      {},
+      children
+    )
 
     if (isObject(children)) {
       forEach((child) => {
@@ -56,11 +74,13 @@ const defineComponent = async (component, state, context) => {
         `define() method must return either an object or an array. Instead received ${children} from ${component}.`
       )
     }
+
     component.children = await map(
       async (child, key) => defineComponent(child, get(['children', key], state), context),
       children
     )
   }
+
   return component
 }
 

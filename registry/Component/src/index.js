@@ -1,5 +1,18 @@
-import { append, get, or, pick, reduce, equals } from '@serverless/utils'
+import {
+  omit,
+  append,
+  set,
+  get,
+  or,
+  pick,
+  reduce,
+  equals,
+  walkReduceDepthFirst
+} from '@serverless/utils'
 import { pickComponentProps } from './utils'
+
+// TODO: move this into @serverless/utils ?!
+import isTypeConstruct from '../../../dist/utils/type/isTypeConstruct'
 
 const DEPLOY = 'deploy'
 
@@ -29,7 +42,23 @@ const Component = (SuperClass) =>
     }
 
     async define() {
+      // `components` are omitted because they are re-included in the return statement
+      // `parent` is omitted since this value is already resolved and considering it causes infinite loops
+      const filteredInstance = omit(['components', 'parent'], this)
+
+      const componentDefinitions = walkReduceDepthFirst(
+        (accum, value, pathParts) => {
+          if (isTypeConstruct(value)) {
+            return set(pathParts, value, accum)
+          }
+          return accum
+        },
+        {},
+        filteredInstance
+      )
+
       return {
+        ...componentDefinitions,
         ...or(this.components, {})
       }
     }
