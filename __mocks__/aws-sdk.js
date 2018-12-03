@@ -84,6 +84,34 @@ const mocks = {
     }
     return Promise.resolve()
   }),
+  getFunctionConfigurationMock: jest.fn().mockImplementation((params) => {
+    if (params.FunctionName === 'already-removed-function') {
+      const error = new Error()
+      error.code = 'ResourceNotFoundException'
+      return Promise.reject(error)
+    }
+    const res = {
+      FunctionName: params.FunctionName,
+      FunctionArn: `rn:aws:lambda:us-east-1:xxx:function:${params.FunctionName}`,
+      Runtime: 'nodejs8.10',
+      Role: `arn:aws:iam::xxx:role/${params.FunctionName}-execution-role`,
+      Handler: 'shim.handler',
+      CodeSize: 1725,
+      Description: 'description',
+      Timeout: 10,
+      MemorySize: 1024,
+      LastModified: '2018-12-03T13:12:31.330+0000',
+      CodeSha256: 'aHncVL5MqrEReacmu9U+DhuuA6+AyOJ5s6eDmWK46IE=',
+      Version: '$LATEST',
+      Environment: { Variables: { SERVERLESS_HANDLER: 'index.hello' } },
+      KMSKeyArn: null,
+      TracingConfig: { Mode: 'PassThrough' },
+      MasterArn: null,
+      RevisionId: '50234eaa-0063-s1c9-897c-b90363f60c8b'
+    }
+
+    return Promise.resolve(res)
+  }),
 
   // IAM
   createRoleMock: jest.fn().mockReturnValue({ Role: { Arn: 'arn:aws:iam::XXXXX:role/test-role' } }),
@@ -300,6 +328,9 @@ const Lambda = function() {
     }),
     deleteFunction: (obj) => ({
       promise: () => mocks.deleteFunctionMock(obj)
+    }),
+    getFunctionConfiguration: (obj) => ({
+      promise: () => mocks.getFunctionConfigurationMock(obj)
     })
   }
 }
